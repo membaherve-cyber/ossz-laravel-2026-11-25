@@ -3,7 +3,10 @@
  * Every cached URL below is relative (or a same-origin asset), so the worker
  * works identically on localhost, osszcollection.com and any subfolder mount.
  */
-const VERSION = 'ossz-v1';
+const VERSION = 'ossz-v2';
+// v2: force eviction of caches left by older workers after the
+// scheme-aware session-cookie / login fix deploy (mirrors the Next.js
+// worker's version-bump behaviour so wedged visitors get a clean slate).
 const OFFLINE_URL = '/offline';
 
 // Static assets cached on install (cache-first afterwards).

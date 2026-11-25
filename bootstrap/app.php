@@ -11,6 +11,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Must run before any cookie-emitting middleware so session, CSRF
+        // and queued cookies all observe the resolved scheme-aware flags.
+        $middleware->web(prepend: [
+            \App\Http\Middleware\SchemeAwareCookies::class,
+        ]);
+
         $middleware->web(append: [
             \Illuminate\Session\Middleware\StartSession::class,
             \Illuminate\View\Middleware\ShareErrorsFromSession::class,
