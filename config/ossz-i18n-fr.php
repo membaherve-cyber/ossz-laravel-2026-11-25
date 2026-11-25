@@ -5,6 +5,7 @@
 return [
     'lang.switch' => 'English',
     'lang.current' => 'FR',
+    'banner.freeDelivery' => '', // vide dans le dictionnaire Next.js → bandeau masqué
     'nav.shop' => 'Boutique',
     'nav.collections' => 'Collections',
     'nav.lookbook' => 'Lookbook',
@@ -16,6 +17,7 @@ return [
     'nav.signin' => 'Se connecter',
     'nav.cart' => 'Sac',
     'nav.backoffice' => 'Administration',
+    'nav.openMenu' => 'Ouvrir le menu',
     'nav.back' => 'Retour',
 
     'buy.now' => 'Acheter',
@@ -34,6 +36,7 @@ return [
     'buy.payTerms' => 'Le paiement s\'effectue intégralement à la commande, en FCFA. Mobile money et carte sont acceptés de la même façon. Vos données de carte ne sont jamais conservées.',
     'buy.momoMtn' => 'MTN Mobile Money',
     'buy.momoOrange' => 'Orange Money',
+    'buy.momoHint' => 'Demande envoyée sur votre téléphone',
     'buy.card' => 'Visa / Mastercard',
     'buy.cod' => 'Paiement à la livraison',
     'buy.proceed' => 'Acheter',
@@ -41,7 +44,9 @@ return [
     'buy.fullDetails' => 'Fiche complète',
     'buy.close' => 'Fermer',
     'buy.wishlist' => 'Favoris',
+    'buy.ln' => 'Favoris', // clé historique mal orthographiée; utilisée par pages/product.blade.php pour le bouton favoris
     'buy.saved' => 'Enregistré',
+    'buy.password' => 'Mot de passe',
     'buy.delivery' => 'Expédition nationale au Cameroun (2 à 4 jours) · retrait en boutique offert à notre boutique Ange Raphael',
     'buy.returns' => 'Les pièces non portées sont reprises sous 14 jours.',
 
@@ -63,6 +68,18 @@ return [
     'cart.continue' => '← Poursuivre mes achats',
     'cart.remove' => 'Retirer',
     'cart.freeAbove' => 'Le retrait en boutique à notre boutique Ange Raphael est offert · expédition nationale au Cameroun.',
+    'cart.checkoutAccount' => 'Commander avec mon compte',
+    'cart.checkoutGuest' => 'Finaliser sans créer de compte',
+
+    'choose.account' => 'Créer un compte et finaliser',
+    'choose.accountHint' => 'Adresse enregistrée, suivi de commande, liste de favoris.',
+
+    'checkout.title' => 'Bientôt à vous',
+    'checkout.guestBanner' => 'Vous commandez en tant qu\'invité. Aucun compte ne sera créé.',
+    'checkout.confirmAddress' => 'Confirmez votre adresse de livraison',
+    'checkout.confirmAddressBody' => 'Merci de vérifier ces informations — notre coursier les utilisera telles quelles.',
+    'checkout.confirmTick' => 'Je confirme que cette adresse de livraison est correcte.',
+    'checkout.place' => 'Passer la commande',
 
     'home.newTitle' => 'Nouveautés de l\'atelier',
     'home.newEyebrow' => 'Vient d\'arriver',
@@ -100,7 +117,9 @@ return [
     'shop.clearAll' => 'Tout effacer',
     'shop.category' => 'Catégorie',
     'shop.collection' => 'Collection',
+    'shop.colour' => 'Couleur',
     'shop.price' => 'Prix',
+    'shop.priceRange' => 'Prix',
     'shop.availability' => 'Disponibilité',
     'shop.inStock' => 'En stock',
     'shop.outOfStock' => 'Épuisé',
@@ -185,6 +204,8 @@ return [
     'footer.letter' => 'La lettre OSSZ',
     'footer.letterBody' => 'Nouveautés, présentations privées et sélections de saison — jamais plus de deux fois par mois.',
     'footer.join' => 'S\'inscrire',
+    'footer.subscribe' => 'S\'inscrire',
+    'footer.newsletterPlaceholder' => 'Votre adresse e-mail',
 
     'offline.title' => 'Vous êtes hors ligne',
     'offline.body' => 'Les pages déjà consultées restent accessibles. Nous nous reconnecterons dès le retour du signal.',

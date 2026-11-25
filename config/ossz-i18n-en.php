@@ -5,6 +5,7 @@
 return [
     'lang.switch' => 'Français',
     'lang.current' => 'EN',
+    'banner.freeDelivery' => '', // empty in Next.js dict → announcement strip stays hidden
     'nav.shop' => 'Shop',
     'nav.collections' => 'Collections',
     'nav.lookbook' => 'Lookbook',
@@ -16,6 +17,7 @@ return [
     'nav.signin' => 'Sign in',
     'nav.cart' => 'Bag',
     'nav.backoffice' => 'Back office',
+    'nav.openMenu' => 'Open menu',
     'nav.back' => 'Back',
 
     'buy.now' => 'Buy now',
@@ -34,6 +36,7 @@ return [
     'buy.payTerms' => 'Payment is taken in full at checkout, in FCFA. Mobile money and card are equally welcome. We never store your card details.',
     'buy.momoMtn' => 'MTN Mobile Money',
     'buy.momoOrange' => 'Orange Money',
+    'buy.momoHint' => 'Prompt sent to your phone',
     'buy.card' => 'Visa / Mastercard',
     'buy.cod' => 'Pay on delivery',
     'buy.proceed' => 'Buy',
@@ -41,7 +44,9 @@ return [
     'buy.fullDetails' => 'Full product page',
     'buy.close' => 'Close',
     'buy.wishlist' => 'Wishlist',
+    'buy.ln' => 'Wishlist', // legacy typo'd key; product.blade.php uses it for the wishlist toggle
     'buy.saved' => 'Saved',
+    'buy.password' => 'Password',
     'buy.delivery' => 'National shipping across Cameroon (2–4 days) · free in-store pickup at our Ange Raphael boutique',
     'buy.returns' => 'Unworn pieces may be returned within 14 days.',
 
@@ -63,6 +68,18 @@ return [
     'cart.continue' => '← Continue shopping',
     'cart.remove' => 'Remove',
     'cart.freeAbove' => 'In-store pickup at our Ange Raphael boutique is free · national shipping across Cameroon.',
+    'cart.checkoutAccount' => 'Checkout with my account',
+    'cart.checkoutGuest' => 'Conclude purchase without an account',
+
+    'choose.account' => 'Create an account & finalise',
+    'choose.accountHint' => 'Saves your address, tracks the order, keeps a wishlist.',
+
+    'checkout.title' => 'Almost yours',
+    'checkout.guestBanner' => 'You are checking out as a guest. No account will be created.',
+    'checkout.confirmAddress' => 'Confirm your delivery address',
+    'checkout.confirmAddressBody' => 'Please check these details carefully — our courier will use them exactly as written.',
+    'checkout.confirmTick' => 'I confirm this delivery address is correct.',
+    'checkout.place' => 'Place order',
 
     // MARKER:PART2
 
@@ -102,7 +119,9 @@ return [
     'shop.clearAll' => 'Clear all',
     'shop.category' => 'Category',
     'shop.collection' => 'Collection',
+    'shop.colour' => 'Colour',
     'shop.price' => 'Price',
+    'shop.priceRange' => 'Price',
     'shop.availability' => 'Availability',
     'shop.inStock' => 'In stock',
     'shop.outOfStock' => 'Sold out',
@@ -187,6 +206,8 @@ return [
     'footer.letter' => 'The OSSZ letter',
     'footer.letterBody' => 'New arrivals, private viewings and seasonal edits — never more than twice a month.',
     'footer.join' => 'Join',
+    'footer.subscribe' => 'Join',
+    'footer.newsletterPlaceholder' => 'Your email address',
 
     'offline.title' => 'You are offline',
     'offline.body' => 'The pages you have already visited remain available. We will reconnect the moment your signal returns.',
