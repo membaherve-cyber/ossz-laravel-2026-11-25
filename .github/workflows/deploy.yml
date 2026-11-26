@@ -163,8 +163,11 @@ jobs:
           # Purge compiled Blade views so every deploy starts clean. A
           # truncated/stale compiled view renders as a 200 + EMPTY body
           # (the "blank page" bug); recompiling from source fixes it.
+          # Blade's compiler auto-creates the directory, so no mkdir needed.
+          # Best-effort: live traffic may recreate files mid-delete — that
+          # is fine (fresh compile) and must not fail the deploy.
+          set cmd:fail-exit no
           rm -r -f public_html/storage/framework/views
-          mkdir -p public_html/storage/framework/views
           quit
           LFTP
           echo "Deployed to Namecheap public_html (upload-only mirror, views purged)."
