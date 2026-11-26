@@ -109,7 +109,7 @@ jobs:
           check "/appointments" "OSSZ"
           check "/order-lookup" "OSSZ"
           check "/offline" "OSSZ"
-          check "/robots.txt" "Sitemap"
+          check "/robots.txt" "Sitemap" 50
           check "/sitemap.xml" "urlset"
       - name: Login smoke (session cookie must survive the POST)
         run: |
@@ -182,11 +182,11 @@ jobs:
           set -e
           BASE="https://osszcollection.com"
           check() {
-            local path="$1" grep_for="${2:-}"
+            local path="$1" grep_for="${2:-}" min_size="${3:-1000}"
             local status size
             status=$(curl -sL -o /tmp/live.html -w '%{http_code}' --max-time 30 "$BASE$path")
             size=$(wc -c < /tmp/live.html)
-            if [ "$status" != "200" ] || [ "$size" -lt 1000 ]; then
+            if [ "$status" != "200" ] || [ "$size" -lt "$min_size" ]; then
               echo "FAIL $path -> HTTP $status, $size bytes"; exit 1
             fi
             if [ -n "$grep_for" ] && ! grep -q "$grep_for" /tmp/live.html; then
@@ -200,7 +200,7 @@ jobs:
           check "/product/ivoire-occasion-gown" "FCFA"
           check "/journal" "OSSZ"
           check "/login" "Back office"
-          check "/robots.txt" "Sitemap"
+          check "/robots.txt" "Sitemap" 50
           check "/sitemap.xml" "urlset"
           check "/offline" ""
           # sw.js must never be HTTP-cached and must be the current version
