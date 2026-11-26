@@ -1,0 +1,47 @@
+name: Deploy to Namecheap
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  ftp-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install lftp
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+
+      - name: Push code to Namecheap (upload-only, never deletes)
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
+        run: |
+          set -euo pipefail
+          lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" <<'LFTP'
+          set ssl:verify-certificate no
+          set ftp:passive-mode on
+          set net:max-retries 6
+          set net:timeout 30
+          set net:total-timeout 1200
+          mirror -R --no-delete --no-perms --parallel=4 \
+            --exclude '^\.git/' \
+            --exclude '^\.github/' \
+            --exclude '^bootstrap/cache/' \
+            --exclude 'database/database\.sqlite$' \
+            --exclude '^vendor/' \
+            --exclude '^storage/' \
+            . public_html/
+          quit
+          LFTP
+          echo "Deployed to Namecheap public_html (upload-only mirror)."

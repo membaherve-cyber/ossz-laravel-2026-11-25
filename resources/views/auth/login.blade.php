@@ -75,5 +75,17 @@
             </p>
         </form>
     </div>
+
+    {{-- Back-office credentials hint — mirrors the Next.js login page so both
+         versions show the same reference logins. --}}
+    <div style="margin-top:1.5rem;border:1px solid var(--line);background:rgba(0,0,0,.02);padding:1rem 1.1rem;font-size:.75rem;line-height:1.7;color:var(--ink-soft, var(--muted, #555));">
+        <p style="margin:0;font-weight:600;">{{ is_fr() ? 'Back office' : 'Back office' }}</p>
+        <p style="margin:.25rem 0 0;">admin / admin · {{ is_fr() ? 'accès complet' : 'full access' }}</p>
+        <p style="margin:0;">manager / manager · {{ is_fr() ? 'accès complet' : 'full access' }} (owner &amp; manager)</p>
+        <p style="margin:0;">staff / staff · {{ is_fr() ? 'commandes, stock, rendez-vous' : 'orders, stock, appointments' }}</p>
+        <p style="margin:.75rem 0 0;font-weight:600;">{{ is_fr() ? 'Autres comptes de démonstration (mot de passe : ossz2026)' : 'Other demonstration accounts (password: ossz2026)' }}</p>
+        <p style="margin:.25rem 0 0;">studio@osszcollections.cm · content uploader</p>
+        <p style="margin:0;">client@example.com · customer</p>
+    </div>
 </div>
 @endsection
