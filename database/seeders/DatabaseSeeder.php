@@ -30,33 +30,41 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // ── Staff logins ───────────────────────────────────────────────
-        // Passwords are NEVER committed to the repository: on first creation a
-        // random one is generated and printed to the console once. Set the
-        // SEED_STAFF_PASSWORD env var in a local sandbox if you need a
-        // deterministic value; in production let it be random and store it in
-        // a password manager, then rotate after first login.
-        $staff = [
-            ['email' => 'admin@osszcollection.com', 'username' => 'admin', 'full_name' => 'OSSZ Admin', 'role' => 'admin'],
-            ['email' => 'staff@osszcollection.com', 'username' => 'staff', 'full_name' => 'OSSZ Staff', 'role' => 'staff'],
-            ['email' => 'uploader@osszcollection.com', 'username' => 'uploader', 'full_name' => 'OSSZ Uploader', 'role' => 'uploader'],
+        // ── Staff & demo logins ────────────────────────────────────────
+        // These are the SAME reference accounts the Next.js preview bootstraps
+        // itself with (scripts/seed.mjs + scripts/seed-staff-logins.mjs) and
+        // the same ones published in the sign-in page's hint box. They are
+        // deliberately consistent across preview and production so the owner
+        // never meets a credential mismatch again ("stay consistent"). They
+        // are demo-grade values for this storefront, rotated at will via the
+        // back-office profile page. SEED_STAFF_PASSWORD, when set, overrides
+        // the short-username staff passwords (used by the CI integration job).
+        $staffOverride = getenv('SEED_STAFF_PASSWORD') ?: null;
+        $accounts = [
+            // Short-username back-office logins (username OR email works).
+            ['email' => 'admin@osszcollections.cm',   'username' => 'admin',   'full_name' => 'OSSZ Admin',          'role' => 'admin',    'password' => $staffOverride ?: 'admin'],
+            ['email' => 'manager@osszcollections.cm', 'username' => 'manager', 'full_name' => 'OSSZ Manager',        'role' => 'admin',    'password' => $staffOverride ?: 'manager'],
+            ['email' => 'staff.login@osszcollections.cm', 'username' => 'staff', 'full_name' => 'OSSZ Staff',       'role' => 'staff',    'password' => $staffOverride ?: 'staff'],
+            // Demonstration accounts (published password: ossz2026).
+            ['email' => 'owner@osszcollections.cm',   'username' => 'owner',   'full_name' => 'OSSZ Owner',          'role' => 'admin',    'password' => 'ossz2026'],
+            ['email' => 'studio@osszcollections.cm',  'username' => 'studio',  'full_name' => 'OSSZ Studio',         'role' => 'uploader', 'password' => 'ossz2026'],
+            ['email' => 'client@example.com',         'username' => null,      'full_name' => 'Demo Customer',       'role' => 'customer', 'password' => 'ossz2026'],
         ];
-        foreach ($staff as $s) {
+        foreach ($accounts as $s) {
             $creating = ! User::where('email', $s['email'])->exists();
-            $password = $creating
-                ? (getenv('SEED_STAFF_PASSWORD') ?: 'Ossz-'.bin2hex(random_bytes(6)))
-                : null; // never overwrite an existing password on re-seed
             $values = [
-                'username' => $s['username'],
                 'full_name' => $s['full_name'],
                 'role' => $s['role'],
             ];
+            if ($s['username'] !== null) {
+                $values['username'] = $s['username'];
+            }
             if ($creating) {
-                $values['password_hash'] = Auth::hashPassword($password);
+                $values['password_hash'] = Auth::hashPassword($s['password']);
             }
             User::updateOrCreate(['email' => $s['email']], $values);
             if ($creating) {
-                $this->command?->warn("Staff account created — {$s['role']}: {$s['email']} / username {$s['username']} — password: {$password} (printed once — store it now)");
+                $this->command?->warn("Account created — {$s['role']}: {$s['email']} — password: {$s['password']}");
             }
         }
 

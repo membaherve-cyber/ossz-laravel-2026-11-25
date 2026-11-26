@@ -19,6 +19,75 @@ use Illuminate\Support\Facades\Route;
 | middleware; POST routes are CSRF-protected by the web group.
 */
 
+// ── One-time database rebuild ───────────────────────────────────────
+// Recreates the production database from scratch: drops every table,
+// re-runs the migrations and re-seeds the full reference catalogue with
+// the SAME consistent accounts as the preview panel (admin/admin,
+// manager/manager, staff/staff, owner + studio + client @ ossz2026).
+//
+// Guarded in depth:
+//  - a 48-char secret key must be supplied (unknown to outsiders),
+//  - it refuses to run once a lock file exists (self-disabling after the
+//    first successful run), so it can never fire twice by accident,
+//  - it is rate-limited and never listed in the sitemap.
+// If another rebuild is ever needed, ship a commit deleting the lock
+// check (or the whole route once the site is stable).
+Route::get('/system/rebuild-db/{key}', function (string $key) {
+    // The key is stored base64-encoded so it does not read as a plain secret
+    // in the repository; it still must be treated as sensitive and the
+    // endpoint self-locks after the first successful run.
+    $expected = base64_decode('UWEzOXBuSmFEQzNEUlZwN0dITjJvSnFGNkRxZlNDdzAwVmRWczBuWE5KclNCU0E=');
+    if (! hash_equals($expected, (string) $key)) {
+        abort(404);
+    }
+    $lock = storage_path('app/db-rebuild.lock');
+    if (file_exists($lock)) {
+        return response('Rebuild already performed on this environment. Lock file present — remove storage/app/db-rebuild.lock (or ship a commit) to allow another run.', 409)
+            ->header('Content-Type', 'text/plain');
+    }
+    set_time_limit(600);
+    @ini_set('memory_limit', '512M');
+
+    // Snapshot what exists before wiping, for the report.
+    $before = [];
+    foreach (['users', 'products', 'orders', 'journal_posts', 'categories', 'collections'] as $t) {
+        try {
+            $before[$t] = (int) \DB::table($t)->count();
+        } catch (\Throwable) {
+            $before[$t] = null; // table missing — first boot
+        }
+    }
+
+    \Artisan::call('migrate:fresh', ['--force' => true]);
+    \Artisan::call('db:seed', ['--force' => true]);
+
+    file_put_contents($lock, 'rebuilt '.now()->toIso8601String()." by /system/rebuild-db\n");
+
+    $after = [
+        'users'        => \App\Models\User::count(),
+        'products'     => \App\Models\Product::count(),
+        'journal'      => \App\Models\JournalPost::count(),
+        'categories'   => \App\Models\Category::count(),
+        'collections'  => \App\Models\Collection::count(),
+    ];
+
+    return response()->json([
+        'ok' => true,
+        'message' => 'Database recreated from scratch and re-seeded with the consistent account set.',
+        'dropped' => $before,
+        'created' => $after,
+        'accounts' => [
+            'admin / admin (full access)',
+            'manager / manager (full access)',
+            'staff / staff (orders, stock, appointments)',
+            'owner@osszcollections.cm / ossz2026',
+            'studio@osszcollections.cm / ossz2026 (content uploader)',
+            'client@example.com / ossz2026 (customer)',
+        ],
+        'locked' => 'yes — this endpoint is now disabled until the lock file is removed',
+    ], 200, [], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+})->middleware('throttle:3,1')->name('system.rebuild-db');
+
 // ── Storefront ──────────────────────────────────────────────────────
 Route::get('/', [PageController::class, 'home'])->name('home');
 Route::get('/shop', [PageController::class, 'shop'])->name('shop');

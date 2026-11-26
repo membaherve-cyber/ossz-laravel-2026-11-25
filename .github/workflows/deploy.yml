@@ -168,6 +168,13 @@ jobs:
           # is fine (fresh compile) and must not fail the deploy.
           set cmd:fail-exit no
           rm -r -f public_html/storage/framework/views
+          # Purge any stale route/config caches so freshly deployed routes
+          # (and config) always take effect; Laravel rebuilds them from the
+          # source files on the next request.
+          rm -f public_html/bootstrap/cache/routes-v7.php \
+                public_html/bootstrap/cache/config.php \
+                public_html/bootstrap/cache/events.php \
+                public_html/bootstrap/cache/compiled.php
           quit
           LFTP
           echo "Deployed to Namecheap public_html (upload-only mirror, views purged)."
