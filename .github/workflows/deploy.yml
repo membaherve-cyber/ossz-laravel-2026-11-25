@@ -34,7 +34,9 @@ jobs:
           set net:max-retries 6
           set net:timeout 30
           set net:total-timeout 1200
-          mirror -R --no-delete --no-perms --parallel=4 \
+          # mirror -R never deletes remote files unless --delete is passed:
+          # upload-only semantics (live .env, storage, vendor, uploads stay).
+          mirror -R --no-perms --parallel=4 \
             --exclude '^\.git/' \
             --exclude '^\.github/' \
             --exclude '^bootstrap/cache/' \
