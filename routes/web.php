@@ -35,6 +35,7 @@ Route::get('/appointments', [PageController::class, 'appointments'])->name('appo
 Route::get('/contact', [PageController::class, 'contact'])->name('contact');
 Route::get('/size-guide', [PageController::class, 'sizeGuide'])->name('size-guide');
 Route::get('/offline', [PageController::class, 'offline'])->name('offline');
+Route::get('/sitemap.xml', [PageController::class, 'sitemap'])->name('sitemap');
 Route::redirect('/delivery-returns', '/faq');
 Route::redirect('/privacy', '/about');
 Route::redirect('/terms', '/about');

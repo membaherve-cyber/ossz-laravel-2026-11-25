@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+
+# Back office and account areas are not for crawlers.
+Disallow: /admin
+Disallow: /cart
+Disallow: /checkout
+Disallow: /account
+Disallow: /profile
+Disallow: /wishlist
+Disallow: /orders
+Disallow: /export/
+Disallow: /media
+
+Sitemap: https://osszcollection.com/sitemap.xml

@@ -3,8 +3,11 @@
     'use strict';
 
     // ── PWA service worker (relative scope, same-origin caches only) ──
+    // The query string version is deliberate: it makes the script URL
+    // unique per release, so browsers install the NEW worker even if an
+    // intermediate cache is still serving the old /sw.js bytes.
     if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
-        navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function () { /* offline support is best-effort */ });
+        navigator.serviceWorker.register('/sw.js?v=3', { scope: '/' }).catch(function () { /* offline support is best-effort */ });
     }
 
     // ── Mobile nav ────────────────────────────────────────────────────
@@ -130,10 +133,9 @@
         });
     }
 
-    // ── Quick view (product cards) ────────────────────────────────────
-    document.querySelectorAll('[data-quick-view]').forEach(function (a) {
-        a.addEventListener('click', function (e) {
-            // Popup is opt-in per card; default behaviour stays a normal link.
-        });
-    });
+    // ── Product cards ─────────────────────────────────────────────────
+    // Cards are plain links to /product/{slug} (server-rendered pages), so
+    // no click interception here. An earlier empty [data-quick-view]
+    // handler was removed: dead listeners make clicks look broken when
+    // markup changes, and the hint chip is decorative only.
 })();

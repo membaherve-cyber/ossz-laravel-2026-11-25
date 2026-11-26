@@ -18,8 +18,12 @@
     $totalPages = $totalPages ?? 1;
     $view   = ($q['view'] ?? '') === 'list' ? 'list' : 'grid';
 
-    // Helper: build href for a chip toggle
-    function chipHref(string $key, string $value, array $q): string {
+    // Helper: build href for a chip toggle.
+    // Guarded: Blade re-includes compiled views (e.g. when an error page
+    // re-renders the same view in-request); a bare `function` declaration
+    // would then fatal with "cannot redeclare" and take the shop down.
+    if (! function_exists('chipHref')) {
+        function chipHref(string $key, string $value, array $q): string {
         $p = $q;
         if (($p[$key] ?? '') === $value) {
             unset($p[$key]);
@@ -29,6 +33,7 @@
         unset($p['page']);
         $qs = http_build_query($p);
         return '/shop' . ($qs ? '?'.$qs : '');
+        }
     }
 
     $activeCount = collect(['category','collection','size','colour','availability','min','max'])->filter(fn($k) => !empty($q[$k]))->count();

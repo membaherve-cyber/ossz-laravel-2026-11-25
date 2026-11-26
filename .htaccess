@@ -1,11 +1,31 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
+    # ── Canonical host: https://osszcollection.com ────────────────────
+    # Send www (any scheme) straight to the HTTPS apex in ONE hop. Without
+    # this the previous redirect chain bounced www visitors through
+    # http://, and scheme-aware session cookies split across two origins —
+    # the classic "login does nothing / cart empties itself" wedge.
+    RewriteCond %{HTTP_HOST} ^www\. [NC]
+    RewriteRule ^(.*)$ https://osszcollection.com/$1 [L,R=301]
+
     # Prevent direct access to hidden files (.env, .git, etc.)
     <FilesMatch "^\.">
         Order allow,deny
         Deny from all
     </FilesMatch>
+
+    # The service worker script must never be cached: browsers byte-compare
+    # it on navigation to decide whether to update. A stale cached sw.js
+    # keeps old caching behaviour alive forever.
+    <IfModule mod_headers.c>
+        <FilesMatch "sw\.js$">
+            Header set Cache-Control "no-cache, must-revalidate"
+        </FilesMatch>
+        <FilesMatch "app\.js$|app\.css$|manifest\.webmanifest$">
+            Header set Cache-Control "no-cache, must-revalidate"
+        </FilesMatch>
+    </IfModule>
 
     # Block direct access to internal Laravel directories
     RewriteRule ^(app|bootstrap|config|database|resources|routes|storage|vendor)($|/) - [F,L]

@@ -166,6 +166,50 @@ class PageController extends Controller
         return view('pages.offline');
     }
 
+    /**
+     * XML sitemap — every public catalogue/journal page plus the static
+     * storefront routes. Previously /sitemap.xml 404'd while /robots.txt
+     * (added as a static file) already referenced it.
+     */
+    public function sitemap()
+    {
+        $base = rtrim(config('app.url') ?: url('/'), '/');
+        $today = now()->toDateString();
+
+        $urls = [
+            ['loc' => '/', 'priority' => '1.0'],
+            ['loc' => '/shop', 'priority' => '0.9'],
+            ['loc' => '/collections', 'priority' => '0.8'],
+            ['loc' => '/journal', 'priority' => '0.6'],
+            ['loc' => '/lookbook', 'priority' => '0.6'],
+            ['loc' => '/appointments', 'priority' => '0.6'],
+            ['loc' => '/about', 'priority' => '0.5'],
+            ['loc' => '/contact', 'priority' => '0.5'],
+            ['loc' => '/faq', 'priority' => '0.5'],
+            ['loc' => '/size-guide', 'priority' => '0.4'],
+            ['loc' => '/order-lookup', 'priority' => '0.3'],
+        ];
+
+        $products = Product::query()->where('is_published', true)->orderBy('slug')
+            ->get(['slug'])->map(fn ($p) => ['loc' => '/product/'.$p->slug, 'priority' => '0.8']);
+        $collections = Collection::query()->where('is_published', true)->orderBy('slug')
+            ->get(['slug'])->map(fn ($c) => ['loc' => '/collections/'.$c->slug, 'priority' => '0.7']);
+        $posts = JournalPost::query()->where('status', 'published')->orderBy('slug')
+            ->get(['slug'])->map(fn ($j) => ['loc' => '/journal/'.$j->slug, 'priority' => '0.5']);
+
+        $all = collect($urls)->merge($products)->merge($collections)->merge($posts);
+
+        $xml = '<?xml version="1.0" encoding="UTF-8"?>'."\n";
+        $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
+        foreach ($all as $u) {
+            $xml .= "  <url><loc>".e($base.$u['loc'])."</loc><lastmod>{$today}</lastmod>"
+                ."<priority>{$u['priority']}</priority></url>\n";
+        }
+        $xml .= '</urlset>'."\n";
+
+        return response($xml, 200, ['Content-Type' => 'application/xml; charset=UTF-8']);
+    }
+
     public function appointments()
     {
         return view('pages.appointments');

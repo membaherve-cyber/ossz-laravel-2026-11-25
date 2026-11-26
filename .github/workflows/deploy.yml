@@ -1,4 +1,4 @@
-name: Deploy to Namecheap
+name: CI + Deploy to Namecheap
 
 on:
   push:
@@ -13,14 +13,130 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  ftp-deploy:
+  # ── 1. Static analysis: every PHP file must parse ────────────────────
+  php-lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+      - name: Syntax-check every PHP file
+        run: |
+          set -e
+          FAIL=0
+          while IFS= read -r -d '' f; do
+            php -l "$f" > /dev/null 2>&1 || { echo "SYNTAX ERROR: $f"; php -l "$f" || true; FAIL=1; }
+          done < <(find app config database routes public -name '*.php' -print0 2>/dev/null)
+          exit $FAIL
 
+  # ── 2. Integration: boot the app on MySQL and exercise the flows ─────
+  integration:
+    runs-on: ubuntu-latest
+    needs: php-lint
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: ossz
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+          extensions: mysqli, pdo_mysql, mbstring, dom, fileinfo
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          sed -i 's/^DB_HOST=.*/DB_HOST=127.0.0.1/' .env
+          sed -i 's/^DB_DATABASE=.*/DB_DATABASE=ossz/' .env
+          sed -i 's/^DB_USERNAME=.*/DB_USERNAME=root/' .env
+          sed -i 's/^DB_PASSWORD=.*/DB_PASSWORD=root/' .env
+          echo "SEED_STAFF_PASSWORD=admin" >> .env
+          php artisan key:generate --force
+          php artisan migrate --force
+          php artisan db:seed --force
+      - name: Boot server
+        run: |
+          php artisan serve --host=127.0.0.1 --port=8080 > server.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf -o /dev/null http://127.0.0.1:8080/ && break || sleep 1
+          done
+      - name: Page smoke (no blank pages allowed)
+        run: |
+          set -e
+          check() {
+            local path="$1" grep_for="$2"
+            local body status
+            status=$(curl -s -o /tmp/page.html -w '%{http_code}' "http://127.0.0.1:8080$path")
+            local size=$(wc -c < /tmp/page.html)
+            if [ "$status" != "200" ] || [ "$size" -lt 1000 ]; then
+              echo "FAIL $path -> HTTP $status, $size bytes"; exit 1
+            fi
+            if [ -n "$grep_for" ] && ! grep -q "$grep_for" /tmp/page.html; then
+              echo "FAIL $path -> missing '$grep_for'"; exit 1
+            fi
+            echo "ok   $path ($size bytes)"
+          }
+          check "/" "OSSZ"
+          check "/shop" "product/"
+          check "/shop?category=tops" "OSSZ"
+          check "/collections" "OSSZ"
+          check "/collections/wouri-nights" "OSSZ"
+          check "/product/ivoire-occasion-gown" "FCFA"
+          check "/journal" "OSSZ"
+          check "/lookbook" "OSSZ"
+          check "/about" "OSSZ"
+          check "/contact" "OSSZ"
+          check "/faq" "OSSZ"
+          check "/size-guide" "OSSZ"
+          check "/cart" "OSSZ"
+          check "/login" "Back office"
+          check "/register" "OSSZ"
+          check "/forgot-password" "OSSZ"
+          check "/appointments" "OSSZ"
+          check "/order-lookup" "OSSZ"
+          check "/offline" "OSSZ"
+          check "/robots.txt" "Sitemap"
+          check "/sitemap.xml" "urlset"
+      - name: Login smoke (session cookie must survive the POST)
+        run: |
+          set -e
+          JAR=/tmp/jar.txt; rm -f "$JAR"
+          TOKEN=$(curl -s -c "$JAR" http://127.0.0.1:8080/login | grep -o 'name="_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"$//')
+          [ -n "$TOKEN" ] || { echo "no CSRF token on login page"; exit 1; }
+          LOC=$(curl -s -b "$JAR" -c "$JAR" -o /dev/null -w '%{redirect_url}' \
+            -H "Referer: http://127.0.0.1:8080/login" \
+            --data-urlencode "_token=$TOKEN" \
+            --data-urlencode "email=admin" \
+            --data-urlencode "password=admin" \
+            http://127.0.0.1:8080/login)
+          echo "login redirect: $LOC"
+          echo "$LOC" | grep -q "/admin" || { echo "login did not reach /admin"; exit 1; }
+          curl -s -b "$JAR" -o /tmp/admin.html -w 'GET /admin: %{http_code}\n' http://127.0.0.1:8080/admin | grep -q 200
+          grep -q "OSSZ" /tmp/admin.html || { echo "admin page empty"; exit 1; }
+          echo "login smoke OK"
+
+  # ── 3. Deploy: upload-only mirror to Namecheap + view-cache purge ────
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [php-lint, integration]
+    steps:
+      - uses: actions/checkout@v4
       - name: Install lftp
         run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
-
       - name: Push code to Namecheap (upload-only, never deletes)
         env:
           FTP_HOST: ${{ secrets.FTP_HOST }}
@@ -44,6 +160,66 @@ jobs:
             --exclude '^vendor/' \
             --exclude '^storage/' \
             . public_html/
+          # Purge compiled Blade views so every deploy starts clean. A
+          # truncated/stale compiled view renders as a 200 + EMPTY body
+          # (the "blank page" bug); recompiling from source fixes it.
+          rm -r -f public_html/storage/framework/views
+          mkdir -p public_html/storage/framework/views
           quit
           LFTP
-          echo "Deployed to Namecheap public_html (upload-only mirror)."
+          echo "Deployed to Namecheap public_html (upload-only mirror, views purged)."
+
+  # ── 4. Live smoke: the production site itself must pass ──────────────
+  smoke-live:
+    runs-on: ubuntu-latest
+    needs: deploy
+    steps:
+      - name: Verify the live storefront end-to-end
+        env:
+          SMOKE_USER: admin
+          SMOKE_PASS: admin
+        run: |
+          set -e
+          BASE="https://osszcollection.com"
+          check() {
+            local path="$1" grep_for="${2:-}"
+            local status size
+            status=$(curl -sL -o /tmp/live.html -w '%{http_code}' --max-time 30 "$BASE$path")
+            size=$(wc -c < /tmp/live.html)
+            if [ "$status" != "200" ] || [ "$size" -lt 1000 ]; then
+              echo "FAIL $path -> HTTP $status, $size bytes"; exit 1
+            fi
+            if [ -n "$grep_for" ] && ! grep -q "$grep_for" /tmp/live.html; then
+              echo "FAIL $path -> missing '$grep_for'"; exit 1
+            fi
+            echo "ok   $path ($size bytes)"
+          }
+          check "/" "OSSZ"
+          check "/shop" "product/"
+          check "/collections/wouri-nights" "OSSZ"
+          check "/product/ivoire-occasion-gown" "FCFA"
+          check "/journal" "OSSZ"
+          check "/login" "Back office"
+          check "/robots.txt" "Sitemap"
+          check "/sitemap.xml" "urlset"
+          check "/offline" ""
+          # sw.js must never be HTTP-cached and must be the current version
+          curl -sI "$BASE/sw.js" | grep -qi "cache-control: no-cache" || { echo "sw.js is cacheable — stale-worker wedge risk"; exit 1; }
+          curl -s "$BASE/sw.js" | grep -q "ossz-v3" || { echo "sw.js is not the v3 worker"; exit 1; }
+          # www must land on the HTTPS apex in one hop
+          WWW_LOC=$(curl -s -o /dev/null -w '%{redirect_url}' "https://www.osszcollection.com/")
+          echo "www redirect: $WWW_LOC"
+          echo "$WWW_LOC" | grep -q "^https://osszcollection.com" || { echo "www does not redirect to https apex"; exit 1; }
+          # login flow on production
+          JAR=/tmp/live_jar.txt; rm -f "$JAR"
+          TOKEN=$(curl -s -c "$JAR" "$BASE/login" | grep -o 'name="_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"$//')
+          LOC=$(curl -s -b "$JAR" -c "$JAR" -o /dev/null -w '%{redirect_url}' \
+            -H "Referer: $BASE/login" \
+            --data-urlencode "_token=$TOKEN" \
+            --data-urlencode "email=$SMOKE_USER" \
+            --data-urlencode "password=$SMOKE_PASS" \
+            "$BASE/login")
+          echo "live login redirect: $LOC"
+          echo "$LOC" | grep -q "/admin" || { echo "live login broken"; exit 1; }
+          curl -s -b "$JAR" -o /tmp/admin.html -w 'GET /admin: %{http_code}\n' --max-time 30 "$BASE/admin" | grep -q 200
+          echo "LIVE SMOKE OK — storefront, assets, host canonicalisation and login all verified"
