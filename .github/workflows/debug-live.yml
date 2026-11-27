@@ -9,7 +9,7 @@ jobs:
     steps:
       - name: Install lftp
         run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
-      - name: Inspect remote tree, write probe and error log
+      - name: PHP probe (version + extensions) and remote state
         env:
           FTP_HOST: ${{ secrets.FTP_HOST }}
           FTP_USER: ${{ secrets.FTP_USER }}
@@ -22,18 +22,22 @@ jobs:
             lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "$COMMON; $1; bye" 2>&1
             echo "--- exit: $?"
           }
-          echo "== FTP home (parent of public_html) =="
-          lftp_cmd "ls -a ." || true
-          echo "== top-level public_html =="
-          lftp_cmd "ls -a public_html" || true
-          echo "== critical code paths =="
-          lftp_cmd "ls -l public_html/public/index.php public_html/public/.htaccess public_html/artisan public_html/composer.json" || true
-          echo "== bootstrap/cache =="
-          lftp_cmd "ls -l public_html/bootstrap/cache" || true
-          echo "== storage/framework =="
-          lftp_cmd "ls -l public_html/storage/framework" || true
-          echo "== WRITE PROBE (5 KB file) =="
-          dd if=/dev/urandom of=/tmp/probe.bin bs=1024 count=5 2>/dev/null
-          lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "$COMMON; put /tmp/probe.bin -o public_html/.write-probe; ls -l public_html/.write-probe; rm -f public_html/.write-probe; bye" 2>&1 || echo "write probe FAILED"
-          echo "== laravel.log tail =="
-          lftp_cmd "cat public_html/storage/logs/laravel.log" | tail -50 || echo "(no laravel.log)"
+          {
+            echo '<?php header("Content-Type: text/plain");'
+            echo 'echo "PHP_VERSION=".PHP_VERSION."\n";'
+            echo 'echo "SAPI=".php_sapi_name()."\n";'
+            echo 'echo "EXTS=".implode(",", get_loaded_extensions())."\n";'
+            echo 'echo "PDO=".(class_exists("PDO")?"yes":"no")."\n";'
+            echo 'echo "PDO_MYSQL=".(extension_loaded("pdo_mysql")?"yes":"no")."\n";'
+            echo 'echo "MBSTRING=".(function_exists("mb_split")?"yes":"no")."\n";'
+          } > /tmp/ossz-probe.php
+          PROBE=".php-probe-$(date +%s).php"
+          echo "== upload probe =="
+          lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "$COMMON; put /tmp/ossz-probe.php -o public_html/$PROBE; bye" 2>&1 || echo "probe upload failed"
+          echo "== run probe =="
+          curl -s --max-time 30 "https://osszcollection.com/$PROBE" || echo "(probe request failed)"
+          echo
+          echo "== delete probe =="
+          lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "$COMMON; rm -f public_html/$PROBE; bye" 2>&1 || true
+          echo "== production error messages (last 5) =="
+          lftp_cmd "cat public_html/storage/logs/laravel.log" | grep -oE "] production\.[A-Z]+: [^{]{0,140}" | tail -5 || true
