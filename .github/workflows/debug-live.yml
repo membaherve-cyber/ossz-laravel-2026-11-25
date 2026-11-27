@@ -48,7 +48,7 @@ jobs:
             done
             echo "bye"
           } > $UP
-          lftp -u "$FTP_USER","$FTP_PASS" -f $UP
+          lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" < $UP
 
           echo "== base (account default) =="
           curl -s --max-time 30 "https://osszcollection.com/probe.php?r=$TS" || echo "(failed)"
@@ -70,7 +70,7 @@ jobs:
             done
             echo "bye"
           } > $CLEAN
-          lftp -u "$FTP_USER","$FTP_PASS" -f $CLEAN || true
+          lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" < $CLEAN || true
 
           echo "== production error messages (last 3) =="
           {
@@ -78,4 +78,4 @@ jobs:
             echo "cat public_html/storage/logs/laravel.log"
             echo "bye"
           } > /tmp/lftp-log.txt
-          lftp -u "$FTP_USER","$FTP_PASS" -f /tmp/lftp-log.txt 2>/dev/null | grep -oE "] production\.[A-Z]+: [^{]{0,160}" | tail -3 || true
+          lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" < /tmp/lftp-log.txt 2>/dev/null | grep -oE "] production\.[A-Z]+: [^{]{0,160}" | tail -3 || true
