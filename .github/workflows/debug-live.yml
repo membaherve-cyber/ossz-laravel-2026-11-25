@@ -7,6 +7,8 @@ jobs:
   debug:
     runs-on: ubuntu-latest
     steps:
+      - name: Install lftp
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
       - name: Inspect remote tree, skeleton and error log
         env:
           FTP_HOST: ${{ secrets.FTP_HOST }}
