@@ -1,4 +1,4 @@
-name: Live debug (read-only)
+name: Live debug (read-only + write probe)
 
 on:
   workflow_dispatch:
@@ -9,27 +9,31 @@ jobs:
     steps:
       - name: Install lftp
         run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
-      - name: Inspect remote tree, skeleton and error log
+      - name: Inspect remote tree, write probe and error log
         env:
           FTP_HOST: ${{ secrets.FTP_HOST }}
           FTP_USER: ${{ secrets.FTP_USER }}
           FTP_PASS: ${{ secrets.FTP_PASS }}
         run: |
           set -uo pipefail
+          COMMON="set ssl:verify-certificate no; set ftp:passive-mode on; set net:max-retries 3"
           lftp_cmd() {
             echo "--- FTP: $1"
-            lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "set ssl:verify-certificate no; set ftp:passive-mode on; set net:max-retries 3; $1; bye" 2>&1
+            lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "$COMMON; $1; bye" 2>&1
             echo "--- exit: $?"
           }
-          echo "== top-level (existence of .env / vendor / .htaccess) =="
+          echo "== FTP home (parent of public_html) =="
+          lftp_cmd "ls -a ." || true
+          echo "== top-level public_html =="
           lftp_cmd "ls -a public_html" || true
-          echo "== public/index.php + public/.htaccess sizes =="
-          lftp_cmd "ls -l public_html/public/index.php public_html/public/.htaccess public_html/artisan" || true
+          echo "== critical code paths =="
+          lftp_cmd "ls -l public_html/public/index.php public_html/public/.htaccess public_html/artisan public_html/composer.json" || true
           echo "== bootstrap/cache =="
           lftp_cmd "ls -l public_html/bootstrap/cache" || true
-          echo "== storage skeleton =="
-          lftp_cmd "ls -l public_html/storage" || true
-          echo "== storage/logs =="
-          lftp_cmd "ls -l public_html/storage/logs" || true
+          echo "== storage/framework =="
+          lftp_cmd "ls -l public_html/storage/framework" || true
+          echo "== WRITE PROBE (5 KB file) =="
+          dd if=/dev/urandom of=/tmp/probe.bin bs=1024 count=5 2>/dev/null
+          lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "$COMMON; put /tmp/probe.bin -o public_html/.write-probe; ls -l public_html/.write-probe; rm -f public_html/.write-probe; bye" 2>&1 || echo "write probe FAILED"
           echo "== laravel.log tail =="
-          lftp_cmd "cat public_html/storage/logs/laravel.log" | tail -80 || echo "(no laravel.log)"
+          lftp_cmd "cat public_html/storage/logs/laravel.log" | tail -50 || echo "(no laravel.log)"

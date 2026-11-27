@@ -202,49 +202,41 @@ jobs:
             } | lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST"
           fi
           echo "Remote wiped (kept .env, vendor/, .well-known/)."
-      - name: Push code to Namecheap (fresh mirror of this version)
+      - name: Push code to Namecheap (mirror + verify + retry)
         env:
           FTP_HOST: ${{ secrets.FTP_HOST }}
           FTP_USER: ${{ secrets.FTP_USER }}
           FTP_PASS: ${{ secrets.FTP_PASS }}
         run: |
-          set -euo pipefail
-          lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" <<'LFTP'
-          set ssl:verify-certificate no
-          set ftp:passive-mode on
-          set net:max-retries 6
-          set net:timeout 30
-          set net:total-timeout 1200
-          # Upload this version over the now-empty tree. mirror -R never
-          # deletes, but everything not in this commit was removed by the
-          # wipe step above — the remote ends up containing exactly this
-          # version (plus the kept .env / vendor / .well-known).
-          mirror -R --no-perms --parallel=4 \
-            --exclude '^\.git/' \
-            --exclude '^\.github/' \
-            --exclude '^bootstrap/cache/' \
-            --exclude 'database/database\.sqlite$' \
-            --exclude '^vendor/' \
-            --exclude '^storage/' \
-            . public_html/
-          # Purge compiled Blade views so every deploy starts clean. A
-          # truncated/stale compiled view renders as a 200 + EMPTY body
-          # (the "blank page" bug); recompiling from source fixes it.
-          # Blade's compiler auto-creates the directory, so no mkdir needed.
-          # Best-effort: live traffic may recreate files mid-delete — that
-          # is fine (fresh compile) and must not fail the deploy.
-          set cmd:fail-exit no
-          rm -r -f public_html/storage/framework/views
-          # Purge any stale route/config caches so freshly deployed routes
-          # (and config) always take effect; Laravel rebuilds them from the
-          # source files on the next request.
-          rm -f public_html/bootstrap/cache/routes-v7.php \
-                public_html/bootstrap/cache/config.php \
-                public_html/bootstrap/cache/events.php \
-                public_html/bootstrap/cache/compiled.php
-          quit
-          LFTP
-          echo "Deployed to Namecheap public_html (fresh full mirror, views purged)."
+          set -uo pipefail
+          COMMON="set ssl:verify-certificate no; set ftp:passive-mode on; set net:max-retries 6; set net:timeout 30; set net:total-timeout 1200"
+          upload() {
+            lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "$COMMON; mirror -R --no-perms --verbose --parallel=4 --exclude '^\\.git/' --exclude '^\\.github/' --exclude '^bootstrap/cache/' --exclude 'database/database\\.sqlite\$' --exclude '^vendor/' --exclude '^storage/' . public_html/; set cmd:fail-exit no; rm -r -f public_html/storage/framework/views; rm -f public_html/bootstrap/cache/routes-v7.php public_html/bootstrap/cache/config.php public_html/bootstrap/cache/events.php public_html/bootstrap/cache/compiled.php; bye" || echo "(mirror exited non-zero — verification below decides)"
+          }
+          verify() {
+            local out missing=0
+            out=$(lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "$COMMON; ls -a public_html; bye" 2>/dev/null)
+            for entry in app bootstrap config database public resources routes artisan composer.json composer.lock .env vendor; do
+              if ! echo "$out" | awk '{print $NF}' | grep -qx "$entry"; then
+                echo "MISSING top-level: $entry"; missing=1
+              fi
+            done
+            out=$(lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "$COMMON; ls -l public_html/public/index.php public_html/public/.htaccess; bye" 2>/dev/null)
+            [ -n "$out" ] || { echo "MISSING: public/index.php or public/.htaccess"; missing=1; }
+            out=$(lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "$COMMON; ls public_html/public/catalogue; bye" 2>/dev/null | wc -l)
+            echo "catalogue files present: $out"
+            [ "$out" -ge 40 ] || { echo "MISSING: catalogue images incomplete"; missing=1; }
+            return $missing
+          }
+          ok=0
+          for attempt in 1 2 3; do
+            echo "== Upload attempt $attempt =="
+            upload
+            if verify; then echo "== Verification PASSED =="; ok=1; break; fi
+            echo "== Verification FAILED — mirroring again (missing files only) =="
+          done
+          [ "$ok" = 1 ] || { echo "FATAL: deployment verification failed after 3 attempts"; exit 1; }
+          echo "Deployed to Namecheap public_html (verified complete: every critical path present)."
       - name: Post-deploy diagnostics (remote tree + error log tail)
         if: always()
         env:
@@ -253,7 +245,7 @@ jobs:
           FTP_PASS: ${{ secrets.FTP_PASS }}
         run: |
           lftp_cmd() {
-            lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "$1; set ssl:verify-certificate no; set ftp:passive-mode on; set net:max-retries 3; bye" 2>/dev/null
+            lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "set ssl:verify-certificate no; set ftp:passive-mode on; set net:max-retries 3; $1; bye" 2>&1
           }
           echo "== top-level listing (kept: .env vendor .well-known) =="
           lftp_cmd "ls -a public_html" || true
