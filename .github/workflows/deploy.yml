@@ -249,12 +249,12 @@ jobs:
           }
           echo "== top-level listing (kept: .env vendor .well-known) =="
           lftp_cmd "ls -a public_html" || true
-          echo "== bootstrap/cache =="
-          lftp_cmd "ls -l public_html/bootstrap/cache" || true
-          echo "== storage skeleton =="
-          lftp_cmd "ls -l public_html/storage" || true
-          echo "== laravel.log tail =="
-          lftp_cmd "cat public_html/storage/logs/laravel.log" | tail -60 || echo "(no laravel.log yet)"
+          echo "== production error messages (last 10) =="
+          lftp_cmd "cat public_html/storage/logs/laravel.log" | grep -oE "] production\.[A-Z]+: [^{]{0,180}" | tail -10 || echo "(no production errors in log)"
+          echo "== laravel.log last 150 lines =="
+          lftp_cmd "cat public_html/storage/logs/laravel.log" | tail -150 || echo "(no laravel.log yet)"
+          echo "== live HTTP probes =="
+          for p in / /shop /login; do curl -s -o /dev/null -w "$p -> %{http_code}\n" --max-time 25 "https://osszcollection.com$p" || echo "$p -> curl failed"; done
 
   # ── 4. Live smoke: the production site itself must pass ──────────────
   smoke-live:
