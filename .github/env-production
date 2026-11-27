@@ -1,0 +1,35 @@
+APP_NAME="OSSZ Collections"
+APP_ENV=production
+APP_KEY=base64:hrGoA1Ln8RILU+H2eCiI+L1RFqFDGeqnyy3E3Ei7DPI=
+APP_DEBUG=false
+APP_TIMEZONE='Africa/Douala'
+APP_URL=https://osszcollection.com
+
+LOG_CHANNEL=stack
+LOG_LEVEL=error
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=osszakze_ossz
+DB_USERNAME=osszakze_user
+DB_PASSWORD="OsszDbPass2026!#"
+
+SESSION_DRIVER=database
+SESSION_LIFETIME=120
+CACHE_STORE=database
+
+# Mail / SMTP Namecheap
+MAIL_MAILER=smtp
+MAIL_HOST=mail.osszcollection.com
+MAIL_PORT=465
+MAIL_USERNAME=hello@osszcollection.com
+MAIL_PASSWORD=
+MAIL_ENCRYPTION=ssl
+MAIL_FROM_ADDRESS="hello@osszcollection.com"
+MAIL_FROM_NAME="OSSZ Collections"
+
+# ImageKit Configuration
+IMAGEKIT_PUBLIC_KEY="public_nzQ/qQeC9tgEjIBUpi+N0UfK7R8="
+IMAGEKIT_PRIVATE_KEY="private_gDNkOusq5cRj3bIWl4GaNpo3/C8="
+IMAGEKIT_URL_ENDPOINT="https://ik.imagekit.io/ez63n4cvn"

@@ -135,6 +135,14 @@ jobs:
     needs: [php-lint, integration]
     steps:
       - uses: actions/checkout@v4
+      - name: Set up PHP 8.2 (build production vendor)
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+          extensions: mbstring, dom, fileinfo, curl, pdo, pdo_mysql, zip, gd
+      - name: Build production vendor (composer install --no-dev)
+        run: composer install --no-interaction --prefer-dist --no-progress --no-dev --optimize-autoloader
       - name: Install lftp
         run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
       - name: Wipe remote (delete old version before upload)
@@ -179,29 +187,58 @@ jobs:
             | sort -u || true)
           echo "Will delete:"
           echo "$rm_names"
-          if [ -n "$rm_names" ]; then
-            {
-              echo "set ssl:verify-certificate no"
-              echo "set ftp:passive-mode on"
-              echo "set net:max-retries 6"
-              echo "set net:timeout 30"
-              echo "set net:total-timeout 1200"
-              echo "set cmd:fail-exit no"
-              for n in $rm_names; do
-                echo "rm -r -f public_html/$n"
-              done
-              # Recreate the runtime skeleton the framework expects (the
-              # mirror excludes storage/ and bootstrap/cache/ on purpose).
-              echo "mkdir -p public_html/bootstrap/cache"
-              echo "mkdir -p public_html/storage/framework/views"
-              echo "mkdir -p public_html/storage/framework/cache/data"
-              echo "mkdir -p public_html/storage/framework/sessions"
-              echo "mkdir -p public_html/storage/logs"
-              echo "mkdir -p public_html/storage/app/public"
-              echo "quit"
-            } | lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST"
+          {
+            echo "set ssl:verify-certificate no"
+            echo "set ftp:passive-mode on"
+            echo "set net:max-retries 6"
+            echo "set net:timeout 30"
+            echo "set net:total-timeout 1200"
+            echo "set cmd:fail-exit no"
+            for n in $rm_names; do
+              echo "rm -r -f public_html/$n"
+            done
+            # Recreate the runtime skeleton the framework expects (the
+            # mirror excludes storage/ and bootstrap/cache/ on purpose).
+            # ALWAYS create it — even when nothing was deleted (e.g. the
+            # account owner manually cleared public_html), because Laravel
+            # 500s without these writable runtime directories.
+            echo "mkdir -p public_html/bootstrap/cache"
+            echo "mkdir -p public_html/storage/framework/views"
+            echo "mkdir -p public_html/storage/framework/cache/data"
+            echo "mkdir -p public_html/storage/framework/sessions"
+            echo "mkdir -p public_html/storage/logs"
+            echo "mkdir -p public_html/storage/app/public"
+            echo "quit"
+          } | lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST"
+          echo "Remote wiped (kept .env, vendor/, .well-known/) + runtime skeleton ensured."
+      - name: Ensure .env exists (self-heal after a manual clear of public_html)
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
+        run: |
+          set -euo pipefail
+          has_env=$(lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" <<'LFTP' 2>/dev/null || true
+          set ssl:verify-certificate no
+          set ftp:passive-mode on
+          set net:max-retries 6
+          ls -a public_html
+          quit
+          LFTP
+          )
+          if echo "$has_env" | awk '{print $NF}' | grep -qx '.env'; then
+            echo "Remote .env present — kept untouched (live credentials preserved)."
+          else
+            echo "Remote .env MISSING — recreating from committed .github/env-production"
+            lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" <<'LFTP'
+          set ssl:verify-certificate no
+          set ftp:passive-mode on
+          set net:max-retries 6
+          put .github/env-production -o public_html/.env
+          quit
+          LFTP
+            echo "Remote .env recreated."
           fi
-          echo "Remote wiped (kept .env, vendor/, .well-known/)."
       - name: Push code to Namecheap (mirror + verify + retry)
         env:
           FTP_HOST: ${{ secrets.FTP_HOST }}
@@ -211,7 +248,7 @@ jobs:
           set -uo pipefail
           COMMON="set ssl:verify-certificate no; set ftp:passive-mode on; set net:max-retries 6; set net:timeout 30; set net:total-timeout 1200"
           upload() {
-            lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "$COMMON; mirror -R --no-perms --verbose --parallel=4 --exclude '^\\.git/' --exclude '^\\.github/' --exclude '^bootstrap/cache/' --exclude 'database/database\\.sqlite\$' --exclude '^vendor/' --exclude '^storage/' . public_html/; set cmd:fail-exit no; rm -f public_html/storage/framework/views/*.php; mkdir -p public_html/storage/framework/views; rm -f public_html/bootstrap/cache/routes-v7.php public_html/bootstrap/cache/config.php public_html/bootstrap/cache/events.php public_html/bootstrap/cache/compiled.php; bye" || echo "(mirror exited non-zero — verification below decides)"
+            lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "$COMMON; mirror -R --no-perms --verbose --parallel=4 --exclude '^\\.git/' --exclude '^\\.github/' --exclude '^bootstrap/cache/' --exclude 'database/database\\.sqlite\$' --exclude '^storage/' . public_html/; set cmd:fail-exit no; rm -f public_html/storage/framework/views/*.php; mkdir -p public_html/storage/framework/views; rm -f public_html/bootstrap/cache/routes-v7.php public_html/bootstrap/cache/config.php public_html/bootstrap/cache/events.php public_html/bootstrap/cache/compiled.php; bye" || echo "(mirror exited non-zero — verification below decides)"
           }
           verify() {
             local out missing=0
