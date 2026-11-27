@@ -245,6 +245,24 @@ jobs:
           quit
           LFTP
           echo "Deployed to Namecheap public_html (fresh full mirror, views purged)."
+      - name: Post-deploy diagnostics (remote tree + error log tail)
+        if: always()
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
+        run: |
+          lftp_cmd() {
+            lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "$1; set ssl:verify-certificate no; set ftp:passive-mode on; set net:max-retries 3; bye" 2>/dev/null
+          }
+          echo "== top-level listing (kept: .env vendor .well-known) =="
+          lftp_cmd "ls -a public_html" || true
+          echo "== bootstrap/cache =="
+          lftp_cmd "ls -l public_html/bootstrap/cache" || true
+          echo "== storage skeleton =="
+          lftp_cmd "ls -l public_html/storage" || true
+          echo "== laravel.log tail =="
+          lftp_cmd "cat public_html/storage/logs/laravel.log" | tail -60 || echo "(no laravel.log yet)"
 
   # ── 4. Live smoke: the production site itself must pass ──────────────
   smoke-live:
