@@ -1,4 +1,4 @@
-name: Live debug (read-only + write probe)
+name: Live debug (PHP probe matrix)
 
 on:
   workflow_dispatch:
@@ -9,7 +9,7 @@ jobs:
     steps:
       - name: Install lftp
         run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
-      - name: PHP probe (version + extensions) and remote state
+      - name: Probe live PHP builds (current + pinned variants)
         env:
           FTP_HOST: ${{ secrets.FTP_HOST }}
           FTP_USER: ${{ secrets.FTP_USER }}
@@ -17,27 +17,54 @@ jobs:
         run: |
           set -uo pipefail
           COMMON="set ssl:verify-certificate no; set ftp:passive-mode on; set net:max-retries 3"
-          lftp_cmd() {
-            echo "--- FTP: $1"
-            lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "$COMMON; $1; bye" 2>&1
-            echo "--- exit: $?"
+          mk_probe() {
+            {
+              echo '<?php header("Content-Type: text/plain");'
+              echo 'echo "PHP_VERSION=".PHP_VERSION."\n";'
+              echo 'echo "SAPI=".php_sapi_name()."\n";'
+              echo 'echo "EXT_COUNT=".count(get_loaded_extensions())."\n";'
+              echo 'echo "HAS_PDO=".(class_exists("PDO")?"yes":"no")."\n";'
+              echo 'echo "HAS_PDO_MYSQL=".(extension_loaded("pdo_mysql")?"yes":"no")."\n";'
+              echo 'echo "HAS_MBSTRING=".(function_exists("mb_split")?"yes":"no")."\n";'
+              echo 'echo "HAS_CURL=".(extension_loaded("curl")?"yes":"no")."\n";'
+              echo 'echo "HAS_GD=".(extension_loaded("gd")?"yes":"no")."\n";'
+            } > /tmp/probe.php
           }
+          mk_probe
+          TS=$(date +%s)
+          # variant A: CloudLinux alt-php 8.2 lsphp handler
+          # variant B: generic php82 handler
+          # base: no pin (account default)
           {
-            echo '<?php header("Content-Type: text/plain");'
-            echo 'echo "PHP_VERSION=".PHP_VERSION."\n";'
-            echo 'echo "SAPI=".php_sapi_name()."\n";'
-            echo 'echo "EXTS=".implode(",", get_loaded_extensions())."\n";'
-            echo 'echo "PDO=".(class_exists("PDO")?"yes":"no")."\n";'
-            echo 'echo "PDO_MYSQL=".(extension_loaded("pdo_mysql")?"yes":"no")."\n";'
-            echo 'echo "MBSTRING=".(function_exists("mb_split")?"yes":"no")."\n";'
-          } > /tmp/ossz-probe.php
-          PROBE=".php-probe-$(date +%s).php"
-          echo "== upload probe =="
-          lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "$COMMON; put /tmp/ossz-probe.php -o public_html/$PROBE; bye" 2>&1 || echo "probe upload failed"
-          echo "== run probe =="
-          curl -s --max-time 30 "https://osszcollection.com/$PROBE" || echo "(probe request failed)"
-          echo
-          echo "== delete probe =="
-          lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "$COMMON; rm -f public_html/$PROBE; bye" 2>&1 || true
+            echo "set ssl:verify-certificate no; set ftp:passive-mode on"
+            echo "put /tmp/probe.php -o public_html/public/probe-base-$TS.php"
+            echo "mkdir -p public_html/public/probe-a-$TS"
+            echo "put /tmp/probe.php -o public_html/public/probe-a-$TS/probe.php"
+            echo "put /dev/stdin -o public_html/public/probe-a-$TS/.htaccess"
+          } > /tmp/nonsense 2>/dev/null || true
+          printf 'AddHandler application/x-httpd-alt-php82___lsphp .php\n' > /tmp/hta-a
+          printf 'AddHandler application/x-httpd-php82 .php\n' > /tmp/hta-b
+          lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" <<CMDS
+          set ssl:verify-certificate no
+          set ftp:passive-mode on
+          put /tmp/probe.php -o public_html/public/probe-base-$TS.php
+          mkdir -p public_html/public/probe-a-$TS
+          put /tmp/probe.php -o public_html/public/probe-a-$TS/probe.php
+          put /tmp/hta-a -o public_html/public/probe-a-$TS/.htaccess
+          mkdir -p public_html/public/probe-b-$TS
+          put /tmp/probe.php -o public_html/public/probe-b-$TS/probe.php
+          put /tmp/hta-b -o public_html/public/probe-b-$TS/.htaccess
+          bye
+          CMDS
+          echo "== probe: base (account default) =="
+          curl -s --max-time 30 "https://osszcollection.com/probe-base-$TS.php" || echo "(failed)"
+          echo "== probe: variant A (alt-php82___lsphp) =="
+          curl -s --max-time 30 "https://osszcollection.com/probe-a-$TS/probe.php" || echo "(failed)"
+          echo "== probe: variant B (x-httpd-php82) =="
+          curl -s --max-time 30 "https://osszcollection.com/probe-b-$TS/probe.php" || echo "(failed)"
+          echo "== static layer check =="
+          curl -s -o /dev/null -w "catalogue img: %{http_code}\n" --max-time 20 "https://osszcollection.com/catalogue/ivoire-occasion-gown-1.jpg"
+          echo "== cleanup =="
+          lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "$COMMON; rm -r -f public_html/public/probe-a-$TS; rm -r -f public_html/public/probe-b-$TS; rm -f public_html/public/probe-base-$TS.php; bye" 2>&1 || true
           echo "== production error messages (last 5) =="
-          lftp_cmd "cat public_html/storage/logs/laravel.log" | grep -oE "] production\.[A-Z]+: [^{]{0,140}" | tail -5 || true
+          lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "$COMMON; cat public_html/storage/logs/laravel.log; bye" 2>/dev/null | grep -oE "] production\.[A-Z]+: [^{]{0,140}" | tail -5 || true
