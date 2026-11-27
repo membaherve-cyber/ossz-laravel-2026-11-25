@@ -15,17 +15,19 @@ jobs:
         run: |
           set -uo pipefail
           lftp_cmd() {
-            lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "$1; set ssl:verify-certificate no; set ftp:passive-mode on; set net:max-retries 3; bye"
+            echo "--- FTP: $1"
+            lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "set ssl:verify-certificate no; set ftp:passive-mode on; set net:max-retries 3; $1; bye" 2>&1
+            echo "--- exit: $?"
           }
-          echo "== top-level (dotfiles) =="
+          echo "== top-level (existence of .env / vendor / .htaccess) =="
           lftp_cmd "ls -a public_html" || true
+          echo "== public/index.php + public/.htaccess sizes =="
+          lftp_cmd "ls -l public_html/public/index.php public_html/public/.htaccess public_html/artisan" || true
           echo "== bootstrap/cache =="
-          lftp_cmd "ls -a public_html/bootstrap/cache" || true
-          echo "== storage tree (top) =="
-          lftp_cmd "ls -a public_html/storage" || true
-          echo "== storage/framework =="
-          lftp_cmd "ls -a public_html/storage/framework" || true
+          lftp_cmd "ls -l public_html/bootstrap/cache" || true
+          echo "== storage skeleton =="
+          lftp_cmd "ls -l public_html/storage" || true
+          echo "== storage/logs =="
+          lftp_cmd "ls -l public_html/storage/logs" || true
           echo "== laravel.log tail =="
-          lftp_cmd "cat public_html/storage/logs/laravel.log" 2>/dev/null | tail -100 || echo "(no laravel.log)"
-          echo "== php error log tail (if any) =="
-          lftp_cmd "cat public_html/.user.ini" 2>/dev/null || echo "(no .user.ini)"
+          lftp_cmd "cat public_html/storage/logs/laravel.log" | tail -80 || echo "(no laravel.log)"
