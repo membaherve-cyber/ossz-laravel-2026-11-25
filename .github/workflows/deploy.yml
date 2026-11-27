@@ -211,7 +211,7 @@ jobs:
           set -uo pipefail
           COMMON="set ssl:verify-certificate no; set ftp:passive-mode on; set net:max-retries 6; set net:timeout 30; set net:total-timeout 1200"
           upload() {
-            lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "$COMMON; mirror -R --no-perms --verbose --parallel=4 --exclude '^\\.git/' --exclude '^\\.github/' --exclude '^bootstrap/cache/' --exclude 'database/database\\.sqlite\$' --exclude '^vendor/' --exclude '^storage/' . public_html/; set cmd:fail-exit no; rm -r -f public_html/storage/framework/views; rm -f public_html/bootstrap/cache/routes-v7.php public_html/bootstrap/cache/config.php public_html/bootstrap/cache/events.php public_html/bootstrap/cache/compiled.php; bye" || echo "(mirror exited non-zero — verification below decides)"
+            lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "$COMMON; mirror -R --no-perms --verbose --parallel=4 --exclude '^\\.git/' --exclude '^\\.github/' --exclude '^bootstrap/cache/' --exclude 'database/database\\.sqlite\$' --exclude '^vendor/' --exclude '^storage/' . public_html/; set cmd:fail-exit no; rm -f public_html/storage/framework/views/*.php; mkdir -p public_html/storage/framework/views; rm -f public_html/bootstrap/cache/routes-v7.php public_html/bootstrap/cache/config.php public_html/bootstrap/cache/events.php public_html/bootstrap/cache/compiled.php; bye" || echo "(mirror exited non-zero — verification below decides)"
           }
           verify() {
             local out missing=0
