@@ -1,0 +1,31 @@
+name: Live debug (read-only)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect remote tree, skeleton and error log
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
+        run: |
+          set -uo pipefail
+          lftp_cmd() {
+            lftp -u "$FTP_USER","$FTP_PASS" "$FTP_HOST" -e "$1; set ssl:verify-certificate no; set ftp:passive-mode on; set net:max-retries 3; bye"
+          }
+          echo "== top-level (dotfiles) =="
+          lftp_cmd "ls -a public_html" || true
+          echo "== bootstrap/cache =="
+          lftp_cmd "ls -a public_html/bootstrap/cache" || true
+          echo "== storage tree (top) =="
+          lftp_cmd "ls -a public_html/storage" || true
+          echo "== storage/framework =="
+          lftp_cmd "ls -a public_html/storage/framework" || true
+          echo "== laravel.log tail =="
+          lftp_cmd "cat public_html/storage/logs/laravel.log" 2>/dev/null | tail -100 || echo "(no laravel.log)"
+          echo "== php error log tail (if any) =="
+          lftp_cmd "cat public_html/.user.ini" 2>/dev/null || echo "(no .user.ini)"
