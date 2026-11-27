@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<!--
+  MAINTENANCE-SHADOW — temporary static page served at "/" while the host's
+  PHP is broken (PDO/pdo_mysql/mbstring/gd missing server-wide on 2026-11-27).
+  This page is intentionally NOT part of the normal storefront. Remove
+  public/index.html (and the DirectoryIndex line in the root .htaccess) as
+  soon as Namecheap restores the PHP extensions, then redeploy.
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <title>OSSZ Collection — Briefly Offline for Maintenance</title>
+    <meta http-equiv="refresh" content="300">
+    <style>
+        :root {
+            --paper: #f6f2ec;
+            --ink: #191714;
+            --muted: #6f675c;
+            --line: #d9d2c6;
+            --accent: #7d5a3c;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            background: var(--paper);
+            color: var(--ink);
+            font-family: Georgia, 'Times New Roman', serif;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+        header, footer {
+            padding: 22px clamp(20px, 6vw, 64px);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+        header { border-bottom: 1px solid var(--line); }
+        footer {
+            margin-top: auto;
+            border-top: 1px solid var(--line);
+            color: var(--muted);
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 12px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+        .wordmark {
+            font-size: 18px;
+            letter-spacing: 0.42em;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+        .wordmark span { color: var(--accent); }
+        .tag {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 11px;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 48px 24px;
+            gap: 28px;
+        }
+        .rule {
+            width: 56px;
+            height: 1px;
+            background: var(--accent);
+        }
+        h1 {
+            font-size: clamp(30px, 6vw, 52px);
+            font-weight: 400;
+            line-height: 1.15;
+            max-width: 22ch;
+        }
+        p.lede {
+            max-width: 46ch;
+            color: var(--muted);
+            font-size: clamp(15px, 2.4vw, 18px);
+            line-height: 1.7;
+        }
+        .status {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 11px;
+            letter-spacing: 0.28em;
+            text-transform: uppercase;
+            color: var(--accent);
+            border: 1px solid var(--line);
+            background: #fffdf9;
+            padding: 12px 22px;
+            border-radius: 999px;
+        }
+        footer a { color: var(--muted); text-decoration: none; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="wordmark">OSSZ <span>Collection</span></div>
+        <div class="tag">Douala &middot; Ready-to-wear</div>
+    </header>
+    <main>
+        <div class="status">Scheduled maintenance</div>
+        <div class="rule" aria-hidden="true"></div>
+        <h1>We are briefly offline, tending to the atelier.</h1>
+        <p class="lede">
+            Our storefront is undergoing maintenance and will be back shortly.
+            Every order, appointment and account remains safe. Thank you for
+            your patience &mdash; this page refreshes itself automatically.
+        </p>
+    </main>
+    <footer>
+        <div>&copy; OSSZ Collection</div>
+        <div>OSSZ Collection &mdash; back soon</div>
+    </footer>
+</body>
+</html>

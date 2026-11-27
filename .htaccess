@@ -1,3 +1,10 @@
+# ── TEMPORARY maintenance shadow (remove when PHP is restored) ──────────
+# While the host's PHP is broken (PDO/pdo_mysql/mbstring/gd missing
+# server-wide, 2026-11-27), serve the static maintenance page at "/"
+# instead of a raw 500. public/index.html wins DirectoryIndex; once that
+# file is removed, "/" falls back to Laravel's index.php.
+DirectoryIndex index.html index.php
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
 

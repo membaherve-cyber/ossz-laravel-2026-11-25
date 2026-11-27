@@ -21,23 +21,44 @@ jobs:
           set -uo pipefail
           BASE="https://osszcollection.com"
 
-          CODE=$(curl -s -o /tmp/h.html -w '%{http_code}' --max-time 30 "$BASE/" || echo 000)
-          SIZE=$(wc -c < /tmp/h.html)
-          echo "GET / -> HTTP $CODE ($SIZE bytes)"
+          get() {
+            curl -s -o "$2" -w '%{http_code}' --max-time 30 "$BASE$1" || echo 000
+          }
 
-          if [ "$CODE" = "200" ] && [ "$SIZE" -gt 1000 ]; then
-            echo "STATUS: HEALTHY"
-            LOGIN=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$BASE/login" || echo 000)
-            SHOP=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$BASE/shop" || echo 000)
-            echo "login=$LOGIN shop=$SHOP"
+          CODE=$(get "/" /tmp/home.html)
+          SIZE=$(wc -c < /tmp/home.html)
+          LOGIN=$(get "/login" /tmp/login.html)
+          SHOP=$(get "/shop" /tmp/shop.html)
+
+          echo "GET / -> HTTP $CODE ($SIZE bytes)"
+          echo "GET /login -> HTTP $LOGIN"
+          echo "GET /shop -> HTTP $SHOP"
+
+          if [ "$CODE" = "200" ] && [ "$LOGIN" = "200" ] && [ "$SHOP" = "200" ]; then
+            if grep -q "MAINTENANCE-SHADOW" /tmp/home.html; then
+              echo "STATUS: HEALTHY (but the MAINTENANCE-SHADOW page is still deployed)"
+              echo "ACTION: remove public/index.html and the DirectoryIndex line in the"
+              echo "        root .htaccess, then redeploy — '/' is currently static."
+            else
+              echo "STATUS: HEALTHY"
+            fi
             exit 0
           fi
 
-          echo "STATUS: DOWN (HTTP $CODE)"
+          if [ "$CODE" = "200" ] && grep -q "MAINTENANCE-SHADOW" /tmp/home.html; then
+            echo "STATUS: DOWN — maintenance shadow is serving '/' (expected during the host outage)"
+            echo "The static page is doing its job; the PHP app behind it is still broken:"
+            echo "  login=$LOGIN shop=$SHOP"
+          else
+            echo "STATUS: DOWN (home=$CODE login=$LOGIN shop=$SHOP)"
+          fi
+
           echo "--- diagnostic hints ---"
-          if [ "$CODE" = "500" ]; then
-            echo "500 with Laravel stack = PHP environment regression."
-            echo "Known cause (2026-11-27): host stripped PHP extensions pdo/pdo_mysql/mbstring/gd from the account's PHP Selector config."
-            echo "Fix: Namecheap must re-enable those extensions (or restore the previous extension set) for alt-php82."
+          if [ "$LOGIN" = "500" ] || [ "$SHOP" = "500" ]; then
+            echo "500 from dynamic routes with Laravel stack = PHP environment regression."
+            echo "Known cause (2026-11-27): host stripped PHP extensions pdo/pdo_mysql/mbstring/gd"
+            echo "from the account's PHP Selector config (Class \"PDO\" not found)."
+            echo "Fix: Namecheap must re-enable those extensions (or restore the previous"
+            echo "extension set) for the account's PHP builds. Code, deploy and DB are fine."
           fi
           exit 1

@@ -319,6 +319,8 @@ jobs:
                 echo "pdo/pdo_mysql/mbstring/gd; production log shows: Class \"PDO\" not found."
                 echo "Fix: Namecheap must re-enable those extensions for alt-php82."
                 echo "Code, deployment and database are fine."
+                echo "NOTE: '/' may serve the static MAINTENANCE-SHADOW page (HTTP 200) —"
+                echo "that is intentional while the outage persists; dynamic routes still 500."
               fi
               exit 1
             fi
