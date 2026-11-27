@@ -1,0 +1,43 @@
+name: Live health check (scheduled)
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-health-check
+  cancel-in-progress: true
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check storefront health
+        run: |
+          set -uo pipefail
+          BASE="https://osszcollection.com"
+
+          CODE=$(curl -s -o /tmp/h.html -w '%{http_code}' --max-time 30 "$BASE/" || echo 000)
+          SIZE=$(wc -c < /tmp/h.html)
+          echo "GET / -> HTTP $CODE ($SIZE bytes)"
+
+          if [ "$CODE" = "200" ] && [ "$SIZE" -gt 1000 ]; then
+            echo "STATUS: HEALTHY"
+            LOGIN=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$BASE/login" || echo 000)
+            SHOP=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$BASE/shop" || echo 000)
+            echo "login=$LOGIN shop=$SHOP"
+            exit 0
+          fi
+
+          echo "STATUS: DOWN (HTTP $CODE)"
+          echo "--- diagnostic hints ---"
+          if [ "$CODE" = "500" ]; then
+            echo "500 with Laravel stack = PHP environment regression."
+            echo "Known cause (2026-11-27): host stripped PHP extensions pdo/pdo_mysql/mbstring/gd from the account's PHP Selector config."
+            echo "Fix: Namecheap must re-enable those extensions (or restore the previous extension set) for alt-php82."
+          fi
+          exit 1
