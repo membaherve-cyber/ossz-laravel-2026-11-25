@@ -29,12 +29,23 @@ jobs:
           echo "HAS_MBSTRING=".(function_exists("mb_strlen")?"yes":"no")."\n";
           echo "HAS_GD=".(extension_loaded("gd")?"yes":"no")."\n";
           echo "EXT_LIST=".implode(",",get_loaded_extensions())."\n";
+          echo "LOADED_INI=".(php_ini_loaded_file()?:"none")."\n";
+          echo "SCANNED_INI=".(php_ini_scanned_files()?:"none")."\n";
+          $ini = php_ini_loaded_file();
+          if ($ini && file_exists($ini)) {
+            $c = (string)file_get_contents($ini);
+            $n = 0;
+            foreach (explode("\n", $c) as $l) { if (preg_match('/^\s*extension\s*=/m', $l)) $n++; }
+            echo "INI_SIZE=".strlen($c)." EXTENSION_LINES=".$n."\n";
+          }
+          $d = "/opt/alt/php82/etc/php.d";
+          if (is_dir($d)) { echo "PHP_D_DIR=present FILES=".count((array)scandir($d))."\n"; } else { echo "PHP_D_DIR=absent\n"; }
           PHP
 
           TS=$(date +%s)
           # name:handler pairs — v74/v81 are CANARIES: if they report 7.4/8.1,
           # per-directory AddHandler pinning works on this server.
-          VARIANTS="v74:alt-php74___lsphp v81:alt-php81___lsphp v83:alt-php83___lsphp v84:alt-php84___lsphp ea81:ea-php81___lsphp ea82:ea-php82___lsphp ea83:ea-php83___lsphp ea84:ea-php84___lsphp"
+          VARIANTS="v82:alt-php82___lsphp v74:alt-php74___lsphp v81:alt-php81___lsphp v83:alt-php83___lsphp v84:alt-php84___lsphp ea81:ea-php81___lsphp"
 
           UP=/tmp/lftp-up.txt
           {
